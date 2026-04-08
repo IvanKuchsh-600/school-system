@@ -1,28 +1,36 @@
 package hasher
 
 import (
+	"auth-service/internal/entities"
+	"errors"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
-// BcryptHasher - адаптер для порта PasswordHasher
 type BcryptHasher struct{}
 
-// NewBcryptHasher - конструктор адаптера
 func NewBcryptHasher() *BcryptHasher {
 	return &BcryptHasher{}
 }
 
-// Hash реализует ports.PasswordHasher
 func (h *BcryptHasher) Hash(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", err
+		return "", entities.ErrHashFailed
 	}
 	return string(hash), nil
 }
 
-// Verify реализует ports.PasswordHasher
-func (h *BcryptHasher) Verify(hashedPassword, plainPassword string) bool {
+func (h *BcryptHasher) Verify(hashedPassword, plainPassword string) error {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(plainPassword))
-	return err == nil
+
+	if err == nil {
+		return nil
+	}
+
+	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+		return entities.ErrInvalidCredentials
+	}
+
+	return entities.ErrInternalError
 }

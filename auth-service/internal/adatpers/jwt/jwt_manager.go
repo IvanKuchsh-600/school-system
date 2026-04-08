@@ -1,8 +1,8 @@
 package jwt
 
 import (
+	"auth-service/internal/entities"
 	"auth-service/internal/ports"
-	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -13,7 +13,6 @@ type JWTManager struct {
 	tokenDuration time.Duration
 }
 
-// NewJWTManager - конструктор адаптера
 func NewJWTManager(secretKey string, durationHours int) *JWTManager {
 	return &JWTManager{
 		secretKey:     secretKey,
@@ -21,14 +20,12 @@ func NewJWTManager(secretKey string, durationHours int) *JWTManager {
 	}
 }
 
-// JWTClaims - внутренняя структура для jwt
 type jwtClaims struct {
 	UserID int64  `json:"user_id"`
 	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
-// Generate реализует ports.JWTManager
 func (m *JWTManager) Generate(userID int64, role string) (string, error) {
 	claims := &jwtClaims{
 		UserID: userID,
@@ -40,26 +37,30 @@ func (m *JWTManager) Generate(userID int64, role string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(m.secretKey))
+
+	signedToken, err := token.SignedString([]byte(m.secretKey))
+	if err != nil {
+		return "", entities.ErrInternalError
+	}
+	return signedToken, nil
 }
 
-// Verify реализует ports.JWTManager
 func (m *JWTManager) Verify(tokenString string) (*ports.JWTClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &jwtClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(m.secretKey), nil
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, entities.ErrInvalidToken
 	}
 
 	if !token.Valid {
-		return nil, errors.New("invalid token")
+		return nil, entities.ErrInvalidToken
 	}
 
 	claims, ok := token.Claims.(*jwtClaims)
 	if !ok {
-		return nil, errors.New("cannot parse claims")
+		return nil, entities.ErrInvalidToken
 	}
 
 	return &ports.JWTClaims{

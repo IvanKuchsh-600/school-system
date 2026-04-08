@@ -25,20 +25,20 @@ func NewAuthUseCase(
 	}
 }
 
-func (s *AuthUseCase) Register(email, plainPassword, role string) (string, error) {
+func (s *AuthUseCase) Register(email, password, role string) (string, error) {
 	err := entities.ValidateEmail(email)
 	if err != nil {
-		return "", fmt.Errorf("email validation failed: %w", err)
+		return "", fmt.Errorf("validate email '%s': %w", email, err)
 	}
 
-	err = entities.ValidatePassword(plainPassword)
+	err = entities.ValidatePassword(password)
 	if err != nil {
-		return "", fmt.Errorf("password validation failed: %w", err)
+		return "", fmt.Errorf("validate password for '%s': %w", email, err)
 	}
 
 	err = entities.ValidateRole(role)
 	if err != nil {
-		return "", fmt.Errorf("role validation failed: %w", err)
+		return "", fmt.Errorf("validate role '%s' for user '%s': %w", role, email, err)
 	}
 
 	existing, err := s.userRepo.FindByEmail(email)
@@ -46,44 +46,61 @@ func (s *AuthUseCase) Register(email, plainPassword, role string) (string, error
 		return "", fmt.Errorf("check user existence for %s: %w", email, err)
 	}
 	if existing != nil {
-		return "", entities.ErrUserAlreadyExists
+		return "", fmt.Errorf("user with email '%s' already exists: %w", email, entities.ErrUserAlreadyExists)
 	}
 
-	hashedPassword, err := s.hasher.Hash(plainPassword)
+	hashedPassword, err := s.hasher.Hash(password)
 	if err != nil {
-		return "", fmt.Errorf("hash password for user %s: %w", email, err)
+		return "", fmt.Errorf("hash password for user '%s': %w", email, err)
 	}
 
 	user, err := entities.NewUser(email, hashedPassword, role)
 	if err != nil {
-		return "", fmt.Errorf("create user entity for %s: %w", email, err)
+		return "", fmt.Errorf("create user entity for '%s': %w", email, err)
 	}
 
 	if err := s.userRepo.Create(user); err != nil {
-		return "", fmt.Errorf("save user %s to database: %w", email, err)
+		return "", fmt.Errorf("save user '%s' to database: %w", email, err)
 	}
 
 	token, err := s.jwt.Generate(user.ID, user.Role)
 	if err != nil {
-		return "", fmt.Errorf("generate token for user %d: %w", user.ID, err)
+		return "", fmt.Errorf("generate token for user '%s' (id=%d): %w", email, user.ID, err)
 	}
 
 	return token, nil
 }
 
-func (s *AuthUseCase) Login(email, plainPassword string) (string, error) {
-	user, err := s.userRepo.FindByEmail(email)
-	if err != nil || user == nil {
-		return "", errors.New("invalid credentials")
+func (s *AuthUseCase) Login(email, password string) (string, error) {
+	err := entities.ValidateEmail(email)
+	if err != nil {
+		return "", fmt.Errorf("validate email '%s': %w", email, err)
 	}
 
-	if !s.hasher.Verify(user.PasswordHash, plainPassword) {
-		return "", errors.New("invalid credentials")
+	err = entities.ValidatePassword(password)
+	if err != nil {
+		return "", fmt.Errorf("validate password for '%s': %w", email, err)
+	}
+
+	user, err := s.userRepo.FindByEmail(email)
+	if err != nil && errors.Is(err, entities.ErrDatabaseOperation) {
+		return "", fmt.Errorf("check user existence for %s: %w", email, err)
+	}
+	if user == nil {
+		return "", fmt.Errorf("user with email '%s' not found: %w", email, entities.ErrUserNotFound)
+	}
+
+	err = s.hasher.Verify(user.PasswordHash, password)
+	if err != nil {
+		if errors.Is(err, entities.ErrInvalidCredentials) {
+			return "", entities.ErrInvalidCredentials
+		}
+		return "", fmt.Errorf("bcrypt compare failed: %w", entities.ErrInternalError)
 	}
 
 	token, err := s.jwt.Generate(user.ID, user.Role)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("generate token for user %d: %w", user.ID, err)
 	}
 
 	return token, nil
