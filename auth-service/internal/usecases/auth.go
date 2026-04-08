@@ -105,7 +105,3 @@ func (s *AuthUseCase) Login(email, password string) (string, error) {
 
 	return token, nil
 }
-
-func (s *AuthUseCase) ValidateToken(tokenString string) (*ports.JWTClaims, error) {
-	return s.jwt.Verify(tokenString)
-}

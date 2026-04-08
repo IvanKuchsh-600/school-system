@@ -1,8 +1,7 @@
-package handler
+package auth
 
 import (
 	"auth-service/internal/entities"
-	"auth-service/internal/usecases"
 	"context"
 	"errors"
 
@@ -11,18 +10,18 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type GrpcHandler struct {
+type GrpcServer struct {
 	pb.UnimplementedAuthServiceServer
-	authUseCase *usecases.AuthUseCase
+	authService AuthService
 }
 
-func NewGrpcHandler(authUseCase *usecases.AuthUseCase) *GrpcHandler {
-	return &GrpcHandler{
-		authUseCase: authUseCase,
+func NewGrpcServer(authService AuthService) *GrpcServer {
+	return &GrpcServer{
+		authService: authService,
 	}
 }
 
-func (h *GrpcHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.AuthResponse, error) {
+func (gs *GrpcServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.AuthResponse, error) {
 	if req.Email == "" {
 		return nil, status.Error(codes.InvalidArgument, "email is required")
 	}
@@ -35,7 +34,7 @@ func (h *GrpcHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 		return nil, status.Error(codes.InvalidArgument, "role is required")
 	}
 
-	token, err := h.authUseCase.Register(req.Email, req.Password, req.Role)
+	token, err := gs.authService.Register(req.Email, req.Password, req.Role)
 
 	if err != nil {
 		return nil, mapEntitiesErrorToGrpc(err)
@@ -47,8 +46,8 @@ func (h *GrpcHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 	}, nil
 }
 
-func (h *GrpcHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthResponse, error) {
-	token, err := h.authUseCase.Login(req.Email, req.Password)
+func (gs *GrpcServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthResponse, error) {
+	token, err := gs.authService.Login(req.Email, req.Password)
 	if err != nil {
 		return nil, mapEntitiesErrorToGrpc(err)
 	}
@@ -59,9 +58,8 @@ func (h *GrpcHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Auth
 	}, nil
 }
 
-// mapDomainErrorToGrpc преобразует доменные ошибки в gRPC статусы
 func mapEntitiesErrorToGrpc(err error) error {
-	// клиентские ошибки - 400
+	// клиентские ошибки
 	switch {
 	case errors.Is(err, entities.ErrEmailRequired):
 		return status.Error(codes.InvalidArgument, "email is required")
