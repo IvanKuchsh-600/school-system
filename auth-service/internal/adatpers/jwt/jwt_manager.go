@@ -3,6 +3,7 @@ package jwt
 import (
 	"auth-service/internal/entities"
 	"auth-service/internal/ports"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -13,11 +14,19 @@ type JWTManager struct {
 	tokenDuration time.Duration
 }
 
-func NewJWTManager(secretKey string, durationHours int) *JWTManager {
+func NewJWTManager(secretKey string, durationHours int) (*JWTManager, error) {
+	if secretKey == "" {
+		return nil, fmt.Errorf("JWT secret key is required")
+	}
+
+	if durationHours <= 0 {
+		return nil, fmt.Errorf("token duration must be positive, got %d", durationHours)
+	}
+
 	return &JWTManager{
 		secretKey:     secretKey,
 		tokenDuration: time.Duration(durationHours) * time.Hour,
-	}
+	}, nil
 }
 
 type jwtClaims struct {

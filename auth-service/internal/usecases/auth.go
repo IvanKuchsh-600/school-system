@@ -17,12 +17,22 @@ func NewAuthUseCase(
 	userRepo ports.UserRepository,
 	jwt ports.JWTManager,
 	hasher ports.PasswordHasher,
-) *AuthUseCase {
+) (*AuthUseCase, error) {
+	if userRepo == nil {
+		return nil, fmt.Errorf("userRepository is required")
+	}
+	if jwt == nil {
+		return nil, fmt.Errorf("jwtManager is required")
+	}
+	if hasher == nil {
+		return nil, fmt.Errorf("passwordHasher is required")
+	}
+
 	return &AuthUseCase{
 		userRepo: userRepo,
 		jwt:      jwt,
 		hasher:   hasher,
-	}
+	}, nil
 }
 
 func (s *AuthUseCase) Register(email, password, role string) (string, error) {

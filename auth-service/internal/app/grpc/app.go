@@ -6,6 +6,7 @@ import (
 	"auth-service/internal/adatpers/repository"
 	"auth-service/internal/ports/grpc/auth"
 	"auth-service/internal/usecases"
+	"fmt"
 	"log"
 	"net"
 
@@ -21,11 +22,16 @@ func NewApp() (*App, error) {
 
 func (a *App) Run() error {
 	userRepo := repository.NewInMemoryUserRepo()
-	jwtManager := jwt.NewJWTManager("my-secret-key", 24)
+	jwtManager, err := jwt.NewJWTManager("my-secret-key", 8)
+	if err != nil {
+		return fmt.Errorf("initialize JWT manager: %w", err)
+	}
 	hasher := hasher.NewBcryptHasher()
 
-	authService := usecases.NewAuthUseCase(userRepo, jwtManager, hasher)
-
+	authService, err := usecases.NewAuthUseCase(userRepo, jwtManager, hasher)
+	if err != nil {
+		return fmt.Errorf("initialize auth use case: %w", err)
+	}
 	grpcHandler := auth.NewGrpcServer(authService)
 
 	lis, err := net.Listen("tcp", ":50051")
@@ -37,7 +43,10 @@ func (a *App) Run() error {
 	pb.RegisterAuthServiceServer(grpcServer, grpcHandler)
 
 	log.Println("Auth service running on :50051")
-	log.Fatal(grpcServer.Serve(lis))
+	err = grpcServer.Serve(lis)
+	if err != nil {
+		return fmt.Errorf("failed to serve gRPC: %w", err)
+	}
 
 	return nil
 }
