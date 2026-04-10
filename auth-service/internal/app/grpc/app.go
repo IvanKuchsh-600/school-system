@@ -34,9 +34,6 @@ func (a *App) Run() error {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	fmt.Println(cfg.JWTSecret)
-	fmt.Println(cfg.JWTExpirationHours)
-	fmt.Println(cfg.ServerPort)
 	userRepo := repository.NewInMemoryUserRepo()
 
 	jwtManager, err := jwt.NewJWTManager(cfg.JWTSecret, cfg.JWTExpirationHours)
