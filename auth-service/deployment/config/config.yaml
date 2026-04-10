@@ -1,0 +1,7 @@
+server:
+  port: ":50051"
+
+jwt:
+  secret: ${JWT_SECRET}         
+  expiration_hours: 8
+

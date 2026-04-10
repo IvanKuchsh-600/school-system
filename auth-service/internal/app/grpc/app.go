@@ -1,11 +1,13 @@
 package grpcapp
 
 import (
+	"auth-service/deployment/config"
 	"auth-service/internal/adatpers/hasher"
 	"auth-service/internal/adatpers/jwt"
 	"auth-service/internal/adatpers/repository"
 	"auth-service/internal/ports/grpc/auth"
 	"auth-service/internal/usecases"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -14,15 +16,30 @@ import (
 	"google.golang.org/grpc"
 )
 
-type App struct{}
+type App struct {
+	cfg *config.Config
+}
 
-func NewApp() (*App, error) {
-	return &App{}, nil
+func NewApp(cfg *config.Config) (*App, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("create app: %w", errors.New("config is required"))
+	}
+
+	return &App{cfg: cfg}, nil
 }
 
 func (a *App) Run() error {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	fmt.Println(cfg.JWTSecret)
+	fmt.Println(cfg.JWTExpirationHours)
+	fmt.Println(cfg.ServerPort)
 	userRepo := repository.NewInMemoryUserRepo()
-	jwtManager, err := jwt.NewJWTManager("my-secret-key", 8)
+
+	jwtManager, err := jwt.NewJWTManager(cfg.JWTSecret, cfg.JWTExpirationHours)
 	if err != nil {
 		return fmt.Errorf("initialize JWT manager: %w", err)
 	}
@@ -34,7 +51,7 @@ func (a *App) Run() error {
 	}
 	grpcHandler := auth.NewGrpcServer(authService)
 
-	lis, err := net.Listen("tcp", ":50051")
+	lis, err := net.Listen("tcp", cfg.ServerPort)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
