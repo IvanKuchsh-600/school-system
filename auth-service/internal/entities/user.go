@@ -4,6 +4,38 @@ import (
 	"regexp"
 )
 
+type User struct {
+	ID           int64
+	Email        string
+	PasswordHash string
+	Role         string // admin, teacher, parent, student
+}
+
+// NewUser создает нового пользователя с валидацией
+func NewUser(email, passwordHash, role string) (*User, error) {
+
+	err := ValidateEmail(email)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ValidatePassword(passwordHash)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ValidateRole(role)
+	if err != nil {
+		return nil, err
+	}
+
+	return &User{
+		Email:        email,
+		PasswordHash: passwordHash,
+		Role:         role,
+	}, nil
+}
+
 func ValidateEmail(email string) error {
 	if email == "" {
 		return ErrEmailRequired
@@ -37,36 +69,4 @@ func ValidateRole(role string) error {
 	}
 
 	return nil
-}
-
-type User struct {
-	ID           int64
-	Email        string
-	PasswordHash string
-	Role         string // admin, teacher, parent, student
-}
-
-// NewUser создает нового пользователя с валидацией
-func NewUser(email, passwordHash, role string) (*User, error) {
-
-	err := ValidateEmail(email)
-	if err != nil {
-		return nil, err
-	}
-
-	err = ValidatePassword(passwordHash)
-	if err != nil {
-		return nil, err
-	}
-
-	err = ValidateRole(role)
-	if err != nil {
-		return nil, err
-	}
-
-	return &User{
-		Email:        email,
-		PasswordHash: passwordHash,
-		Role:         role,
-	}, nil
 }

@@ -1,8 +1,7 @@
-package handler
+package auth
 
 import (
 	"auth-service/internal/entities"
-	"auth-service/internal/usecases"
 	"context"
 	"errors"
 
@@ -11,21 +10,18 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// GrpcHandler - адаптер, который преобразует gRPC запросы в вызовы use cases
-type GrpcHandler struct {
+type GrpcServer struct {
 	pb.UnimplementedAuthServiceServer
-	authUseCase *usecases.AuthUseCase
+	authService AuthService
 }
 
-// NewGrpcHandler - конструктор адаптера
-func NewGrpcHandler(authUseCase *usecases.AuthUseCase) *GrpcHandler {
-	return &GrpcHandler{
-		authUseCase: authUseCase,
+func NewGrpcServer(authService AuthService) *GrpcServer {
+	return &GrpcServer{
+		authService: authService,
 	}
 }
 
-// RegisterAdmin - обработчик gRPC запроса
-func (h *GrpcHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.AuthResponse, error) {
+func (gs *GrpcServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.AuthResponse, error) {
 	if req.Email == "" {
 		return nil, status.Error(codes.InvalidArgument, "email is required")
 	}
@@ -38,10 +34,10 @@ func (h *GrpcHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 		return nil, status.Error(codes.InvalidArgument, "role is required")
 	}
 
-	token, err := h.authUseCase.Register(req.Email, req.Password, req.Role)
+	token, err := gs.authService.Register(req.Email, req.Password, req.Role)
 
 	if err != nil {
-		return nil, mapDomainErrorToGrpc(err)
+		return nil, mapEntitiesErrorToGrpc(err)
 	}
 
 	return &pb.AuthResponse{
@@ -50,14 +46,10 @@ func (h *GrpcHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 	}, nil
 }
 
-// Login - обработчик gRPC запроса
-func (h *GrpcHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthResponse, error) {
-	token, err := h.authUseCase.Login(req.Email, req.Password)
+func (gs *GrpcServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthResponse, error) {
+	token, err := gs.authService.Login(req.Email, req.Password)
 	if err != nil {
-		return &pb.AuthResponse{
-			Token:   "",
-			Message: err.Error(),
-		}, nil
+		return nil, mapEntitiesErrorToGrpc(err)
 	}
 
 	return &pb.AuthResponse{
@@ -66,27 +58,8 @@ func (h *GrpcHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Auth
 	}, nil
 }
 
-// ValidateToken - обработчик gRPC запроса
-func (h *GrpcHandler) ValidateToken(ctx context.Context, req *pb.ValidateTokenRequest) (*pb.ValidateTokenResponse, error) {
-	claims, err := h.authUseCase.ValidateToken(req.Token)
-	if err != nil {
-		return &pb.ValidateTokenResponse{
-			Valid:  false,
-			Role:   "",
-			UserId: 0,
-		}, nil
-	}
-
-	return &pb.ValidateTokenResponse{
-		Valid:  true,
-		Role:   claims.Role,
-		UserId: claims.UserID,
-	}, nil
-}
-
-// mapDomainErrorToGrpc преобразует доменные ошибки в gRPC статусы
-func mapDomainErrorToGrpc(err error) error {
-	// клиентские ошибки - 400
+func mapEntitiesErrorToGrpc(err error) error {
+	// клиентские ошибки
 	switch {
 	case errors.Is(err, entities.ErrEmailRequired):
 		return status.Error(codes.InvalidArgument, "email is required")
@@ -95,7 +68,6 @@ func mapDomainErrorToGrpc(err error) error {
 
 	case errors.Is(err, entities.ErrPasswordRequired):
 		return status.Error(codes.InvalidArgument, "password is required")
-
 	case errors.Is(err, entities.ErrRoleRequired):
 		return status.Error(codes.InvalidArgument, "role is required")
 	case errors.Is(err, entities.ErrRoleInvalid):
@@ -104,12 +76,17 @@ func mapDomainErrorToGrpc(err error) error {
 	// бизнес-ошибки
 	case errors.Is(err, entities.ErrUserAlreadyExists):
 		return status.Error(codes.AlreadyExists, "user with this email already exists")
+	case errors.Is(err, entities.ErrInvalidCredentials):
+		return status.Error(codes.Unauthenticated, "invalid email or password")
 
 	// внутренние ошибки - 500
 	case errors.Is(err, entities.ErrDatabaseOperation):
 		return status.Error(codes.Internal, "internal server error, please try again later")
 
 	case errors.Is(err, entities.ErrHashFailed):
+		return status.Error(codes.Internal, "internal server error, please try again later")
+
+	case errors.Is(err, entities.ErrInternalError):
 		return status.Error(codes.Internal, "internal server error, please try again later")
 
 	default:
