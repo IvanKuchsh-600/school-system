@@ -1,12 +1,15 @@
 package main
 
 import (
+	"auth-service/deployment/config"
 	grpcapp "auth-service/internal/app/grpc"
 	"log"
 )
 
 func main() {
-	app, err := grpcapp.NewApp()
+	cfg := config.MustLoad()
+
+	app, err := grpcapp.NewApp(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
