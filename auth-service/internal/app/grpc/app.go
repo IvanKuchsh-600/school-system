@@ -4,7 +4,8 @@ import (
 	"auth-service/deployment/config"
 	"auth-service/internal/adatpers/hasher"
 	"auth-service/internal/adatpers/jwt"
-	"auth-service/internal/adatpers/repository"
+	"auth-service/internal/adatpers/repository/postgres"
+	"auth-service/internal/entities"
 	"auth-service/internal/ports/grpc/auth"
 	"auth-service/internal/usecases"
 	"errors"
@@ -34,18 +35,24 @@ func (a *App) Run() error {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	userRepo := repository.NewInMemoryUserRepo()
+	userRepo, err := postgres.NewUserRepository(
+		"postgresql://postgres:School72!jelrh-21307@localhost:30000/school_system?sslmode=disable")
+	if err != nil {
+		return fmt.Errorf("Faild to connect: %w", entities.ErrInternalError)
+	}
 
 	jwtManager, err := jwt.NewJWTManager(cfg.JWTSecret, cfg.JWTExpirationHours)
 	if err != nil {
 		return fmt.Errorf("initialize JWT manager: %w", err)
 	}
+
 	hasher := hasher.NewBcryptHasher()
 
 	authService, err := usecases.NewAuthUseCase(userRepo, jwtManager, hasher)
 	if err != nil {
 		return fmt.Errorf("initialize auth use case: %w", err)
 	}
+
 	grpcHandler := auth.NewGrpcServer(authService)
 
 	lis, err := net.Listen("tcp", cfg.ServerPort)
@@ -57,6 +64,7 @@ func (a *App) Run() error {
 	pb.RegisterAuthServiceServer(grpcServer, grpcHandler)
 
 	log.Println("Auth service running on :50051")
+	
 	err = grpcServer.Serve(lis)
 	if err != nil {
 		return fmt.Errorf("failed to serve gRPC: %w", err)

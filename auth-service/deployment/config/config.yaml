@@ -2,6 +2,11 @@ server:
   port: ":50051"
 
 jwt:
-  secret: ${JWT_SECRET}         
   expiration_hours: 8
+
+#database:
+#  port: ${PG_PORT}
+#  postgres_user: ${POSTGRES_USER}
+#  postgres_password: ${POSTGRES_PASSWORD}
+#  postgres_db: ${POSTGRES_DB}
 

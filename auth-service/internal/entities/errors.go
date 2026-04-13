@@ -42,3 +42,7 @@ var (
 var (
 	ErrInternalError = errors.New("Internal error")
 )
+
+var (
+	ErrInvalidParams = errors.New("Invalid params")
+)
