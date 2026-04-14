@@ -1,14 +1,14 @@
 package middleware
 
 import (
-	"gateway/internal/client"
+	"gateway/internal/adapters/client/gprc"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-func JWTAuth(authClient *client.AuthClient) gin.HandlerFunc {
+func JWTAuth(authClient *gprcauth.AuthClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
