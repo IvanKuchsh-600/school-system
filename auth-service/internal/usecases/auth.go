@@ -51,7 +51,7 @@ func (s *AuthUseCase) Register(email, password, role string) (string, error) {
 		return "", fmt.Errorf("validate role '%s' for user '%s': %w", role, email, err)
 	}
 
-	existing, err := s.userRepo.FindByEmail(email)
+	existing, err := s.userRepo.GetByEmail(email)
 	if err != nil && errors.Is(err, entities.ErrDatabaseOperation) {
 		return "", fmt.Errorf("check user existence for %s: %w", email, err)
 	}
@@ -69,8 +69,9 @@ func (s *AuthUseCase) Register(email, password, role string) (string, error) {
 		return "", fmt.Errorf("create user entity for '%s': %w", email, err)
 	}
 
-	if err := s.userRepo.Create(user); err != nil {
-		return "", fmt.Errorf("save user '%s' to database: %w", email, err)
+	err = s.userRepo.Create(user)
+	if err != nil {
+		return "", fmt.Errorf("save user '%s' to database: %w", email, entities.ErrDatabaseOperation)
 	}
 
 	token, err := s.jwt.Generate(user.ID, user.Role)
@@ -92,7 +93,7 @@ func (s *AuthUseCase) Login(email, password string) (string, error) {
 		return "", fmt.Errorf("validate password for '%s': %w", email, err)
 	}
 
-	user, err := s.userRepo.FindByEmail(email)
+	user, err := s.userRepo.GetByEmail(email)
 	if err != nil && errors.Is(err, entities.ErrDatabaseOperation) {
 		return "", fmt.Errorf("check user existence for %s: %w", email, err)
 	}

@@ -4,6 +4,7 @@ import (
 	"auth-service/internal/entities"
 	"context"
 	"errors"
+	"fmt"
 
 	pb "github.com/IvanKuchsh-600/proto"
 	"google.golang.org/grpc/codes"
@@ -59,6 +60,7 @@ func (gs *GrpcServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Auth
 }
 
 func mapEntitiesErrorToGrpc(err error) error {
+	fmt.Println(err)
 	// клиентские ошибки
 	switch {
 	case errors.Is(err, entities.ErrEmailRequired):
