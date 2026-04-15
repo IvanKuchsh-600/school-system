@@ -97,7 +97,7 @@ func (s *AuthUseCase) Login(email, password string) (string, error) {
 		return "", fmt.Errorf("check user existence for %s: %w", email, err)
 	}
 	if user == nil {
-		return "", fmt.Errorf("user with email '%s' not found: %w", email, entities.ErrUserNotFound)
+		return "", fmt.Errorf("user with email '%s' not found: %w", email, entities.ErrInvalidCredentials)
 	}
 
 	err = s.hasher.Verify(user.PasswordHash, password)
